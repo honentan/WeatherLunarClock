@@ -1,13 +1,16 @@
+//#define TNHMETER // 温湿度检测SHT40
+#define TTP233   // 触摸按键模块
+#define WIFI_MANAGER
+
 #include <Arduino.h>
 #include <ESP8266HTTPClient.h>
-// #include <ESP8266WebServer.h>
-#include <ESP8266WiFi.h>
-//#include <coredecls.h>
-// #include <sys/time.h>
 #include <time.h>
 
-#define TNHMETER
-
+#ifdef WIFI_MANAGER
+  #include <WiFiManager.h> // https://github.com/tzapu/WiFiManager
+#else
+  #include <ESP8266WiFi.h>
+#endif
 
 /* 使用0.96寸的OLED屏幕需要使用包含这个头文件 */
 #include "SSD1306Wire.h"
@@ -28,28 +31,37 @@ const int I2C_ADDR = 0x3c; // oled屏幕的I2c地址
 #define SDA_PIN 4          // SDA引脚，默认gpio4(D2)
 #define SCL_PIN 5          // SCL引脚，默认gpio5(D1)
 
+#ifdef TTP233
+  #define TTP233_PIN D8     // GPIO15
+  #define OLED_ON_SECOND 20 // OLED按键点亮秒数
+  
+  uint32_t click_millis = 0;
+  bool click_on = false;
+
+  ICACHE_RAM_ATTR void ttp233_interrupt() {
+    click_millis = millis();
+    click_on = false;
+  }
+#endif
+
 /* 新建一个oled屏幕对象，需要输入IIC地址，SDA和SCL引脚号 */
 SSD1306Wire oled(I2C_ADDR, SDA_PIN, SCL_PIN);
 /* 新建一个olde屏幕ui控制对象，参数为oled屏幕对象指针 */
 OLEDDisplayUi ui(&oled);
 
-#ifdef TNHMETER // 温湿度模块
-  // 温湿度模块初始化
-  Adafruit_SHT4x sht4 = Adafruit_SHT4x();
+#ifdef TNHMETER // 温湿度检测模块
+  Adafruit_SHT4x sht4 = Adafruit_SHT4x(); // 温湿度模块初始化
+  sensors_event_t humidity, temp; // 湿度，温度全局变量
 #endif
 
 // 数据全局变量
 time_t now;
+bool is_oled_on = true;
 
 int NTP_sync_hour = -1;
 int weather_now_sync_min = -1;
 int weather_3d_sync_hour = -1;
 int lunar_sync_mday = -1;
-
-#ifdef TNHMETER // 温湿度模块
-  // 温湿度
-  sensors_event_t humidity, temp;
-#endif
 
 /* 4个屏幕 */
 WL_FRAME wl_frame;
@@ -108,6 +120,13 @@ void setup()
   sht4_setup();
 #endif
 
+#ifdef TTP233
+  // 设置外置按钮管脚为上拉输入模式
+  pinMode(TTP233_PIN, INPUT_PULLUP);
+  // 设置外置按钮管脚中断为上升沿触发模式
+  attachInterrupt(TTP233_PIN, ttp233_interrupt, RISING);
+#endif
+
   /* 2. oled屏幕初始化，oled屏幕ui显示控制设置 */
   oled_ui_setup();
 
@@ -136,6 +155,21 @@ void loop()
   /* LED状态取反 */
   digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
 
+#ifdef TTP233
+  if (click_millis > 0) { // 按了TTP233
+    if (millis() - click_millis < OLED_ON_SECOND * 1000) {
+      if ((!is_oled_on) && (!click_on)) { // OLED关闭且按TTP233后未打开过
+        click_on = true;
+        oled.setContrast(50); // OLED打开
+      }
+    } else {
+      if (!is_oled_on)
+        oled.setContrast(0);  // OLED关闭
+      click_millis = 0;
+    }
+  }
+#endif
+
   //delay(500);
 }
 
@@ -160,22 +194,37 @@ void updateAll()
 {
   struct tm *p = nowTimeStruct();
 
+  /*
+  // 测试TTP233
+  if ((p->tm_min % 2 == 0) && (p->tm_sec == 0)) {
+    oled.setContrast(0);      // 降低屏幕亮度，0为关闭
+    is_oled_on = false;
+  }
+  if ((p->tm_min % 2 == 1) && (p->tm_sec == 0)) {
+    oled.setContrast(50);     // 恢复屏幕亮度，最高255
+    is_oled_on = true;
+  }
+  */
+
 #ifdef TNHMETER // 温湿度模块
   sht4.getEvent(&humidity, &temp);// populate temp and humidity objects with fresh data
 #endif
 
   // NTP同步：1小时
-  if ((p->tm_hour != NTP_sync_hour) && (p->tm_sec > 20))
-  {
+  if ((p->tm_hour != NTP_sync_hour) && (p->tm_sec > 20)) {
     Serial.printf("%d-%d %d:%d:%d Start NTPSync...\n", p->tm_mon, p->tm_mday, p->tm_hour, p->tm_min, p->tm_sec);
     wifiConnect();
 
     NTPSync(p->tm_hour);
-    
-    if (p->tm_hour >= 23 || p->tm_hour < 6) // 23点-6点关闭屏幕（降低亮度至1仍比较亮）
-      oled.setContrast(0);       // 降低屏幕亮度，0为关闭
-    else  // 6点-23点恢复亮度
-      oled.setContrast(200);     // 恢复屏幕亮度，最高255
+
+    if (p->tm_hour >= 23 || p->tm_hour < 6) { // 23点-6点关闭屏幕（降低亮度至1仍比较亮）
+      oled.setContrast(0);      // 降低屏幕亮度，0为关闭
+      is_oled_on = false;
+    } else { // 6点-23点恢复亮度
+      oled.setContrast(50);     // 恢复屏幕亮度，最高255
+      is_oled_on = true;
+    }
+
     Serial.printf("update1 free heap: %d\n", ESP.getFreeHeap());
   }
 
@@ -230,26 +279,61 @@ void updateAll()
   }
 }
 
-// WIFI连接
-void wifiConnect()
-{
-  if (WiFi.status() == WL_CONNECTED)
-  {
-    //Serial.print("Already connected!\n");
 
-    return;
-  }
+#ifdef WIFI_MANAGER
+  // WIFI连接，使用WiFiManager，Web配网
+  void wifiConnect() {
+    // WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
+    // it is a good practice to make sure your code sets wifi mode how you want it.
 
-  Serial.printf("\nWIFI connecting to %s ", WIFI_SSID);
-  WiFi.begin(WIFI_SSID, WIFI_PWD);
-  while (WiFi.status() != WL_CONNECTED)
-  {
-    Serial.print('.');
-    delay(80);
+    // put your setup code here, to run once:
+    Serial.begin(115200);
+    
+    //WiFiManager, Local intialization. Once its business is done, there is no need to keep it around
+    WiFiManager wm;
+
+    // reset settings - wipe stored credentials for testing
+    // these are stored by the esp library
+    // wm.resetSettings();
+
+    // Automatically connect using saved credentials,
+    // if connection fails, it starts an access point with the specified name ( "AutoConnectAP"),
+    // if empty will auto generate SSID, if password is blank it will be anonymous AP (wm.autoConnect())
+    // then goes into a blocking loop awaiting configuration and will return success result
+
+    bool res;
+    // res = wm.autoConnect(); // auto generated AP name from chipid
+    // res = wm.autoConnect("AutoConnectAP"); // anonymous ap
+    res = wm.autoConnect("AutoConnectAP","password"); // password protected ap
+
+    if(!res) {
+        Serial.println("Failed to connect");
+        // ESP.restart();
+    } else {
+        //if you get here you have connected to the WiFi    
+        Serial.println("connected...yeey :)");
+    }
   }
-  Serial.printf("done!\n");
-  //delay(500);
-}
+#else
+  // WIFI连接，使用预置SSID
+  void wifiConnect() {
+    if (WiFi.status() == WL_CONNECTED) {
+      //Serial.print("Already connected!\n");
+  
+      return;
+    }
+  
+    Serial.printf("\nWIFI connecting to %s ", WIFI_SSID);
+    WiFi.begin(WIFI_SSID, WIFI_PWD);
+    while (WiFi.status() != WL_CONNECTED) {
+      Serial.print('.');
+      delay(80);
+    }
+    Serial.printf("done!\n");
+    //delay(500);
+  }
+#endif
+
 
 // NTP时间同步
 void NTPSync(int sync_hour)
