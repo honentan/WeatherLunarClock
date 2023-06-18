@@ -71,8 +71,8 @@ public:
   void drawWeather3d(OLEDDisplay *display, int16_t x, int16_t y);
   void updateWeatherNow(WeatherData weather_data);
   void drawWeatherNow(OLEDDisplay *display, int16_t x, int16_t y);
-  void TnHMeter(int8_t temperature, int8_t humidity,
-                 OLEDDisplay *display, int16_t x, int16_t y);
+  void TnHMeter(float temperature, float humidity,
+                OLEDDisplay *display, int16_t x, int16_t y);
   void digitalClock(struct tm *p,
                     OLEDDisplay *display, int16_t x, int16_t y);
   void drawLunarCalendar(OLEDDisplay *display, int16_t x, int16_t y);

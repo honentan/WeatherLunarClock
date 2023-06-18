@@ -90,7 +90,7 @@ void frameWeather3d(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, 
   // 画屏幕函数数组 - 4.温湿度计
   void frameTnHMeter(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t y)
   {
-    wl_frame.TnHMeter(int(temp.temperature), int(humidity.relative_humidity), display, x, y);
+    wl_frame.TnHMeter(temp.temperature, humidity.relative_humidity, display, x, y);
   }
 #endif
 

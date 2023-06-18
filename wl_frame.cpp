@@ -90,14 +90,14 @@ int8_t WL_FRAME::solarFontIndex(const char* solar_term) {
 
 void WL_FRAME::updateWeatherIconBits(FontSize font_size, const char *icon_id[]) {
   if (font_size == LARGE) {
-	  if (strcmp(icon_id[0], w_icon48.icon_id) == 0)
-	    return;
+    if (strcmp(icon_id[0], w_icon48.icon_id) == 0)
+      return;
   
     strcpy(w_icon48.icon_id, icon_id[0]);
 
-	  int8_t index = weatherIconIndex(icon_id[0]);
-	  if (index == w_icon48.index)
-	    return;
+    int8_t index = weatherIconIndex(icon_id[0]);
+    if (index == w_icon48.index)
+      return;
   
     w_icon48.index = index;
     memcpy(w_icon48.bits, weather_icon_4848[index], WEATHER_ICON_L_LENGTH);
@@ -116,17 +116,14 @@ void WL_FRAME::updateWeatherIconBits(FontSize font_size, const char *icon_id[]) 
   }
 }
 
-int8_t WL_FRAME::weatherIconIndex(const char* icon_id)
-{
+int8_t WL_FRAME::weatherIconIndex(const char* icon_id) {
   if (strlen(icon_id) != 2)
     return 0;
 
   int index = 0;
 
-  for (int i = 0; i < WEATHER_FONT_NUMBER; i++)
-  {
-    if (strstr(weather_icon_ids[i], icon_id) != NULL)
-    {
+  for (int i = 0; i < WEATHER_FONT_NUMBER; i++) {
+    if (strstr(weather_icon_ids[i], icon_id) != NULL) {
       index = i;
       break;
     }
@@ -135,8 +132,7 @@ int8_t WL_FRAME::weatherIconIndex(const char* icon_id)
   return index;
 }
 
-void WL_FRAME::updateWeather3d(WeatherData* weather_data)
-{
+void WL_FRAME::updateWeather3d(WeatherData* weather_data) {
   weather_3d[0] = weather_data[0];
   weather_3d[1] = weather_data[1];
   
@@ -144,8 +140,7 @@ void WL_FRAME::updateWeather3d(WeatherData* weather_data)
   updateWeatherIconBits(SMALL, icon_id);
 }
   
-void WL_FRAME::drawWeather3d(OLEDDisplay *display, int16_t x, int16_t y)
-{
+void WL_FRAME::drawWeather3d(OLEDDisplay *display, int16_t x, int16_t y) {
   if ((strcmp(w_icon30[0].icon_id, "xx") == 0) ||
     (strcmp(w_icon30[1].icon_id, "xx") == 0))
     return;
@@ -167,18 +162,16 @@ void WL_FRAME::updateLunar(LunarCalendar l_lunar) {
   lunar_calendar = l_lunar;
   updateLunarFontBits();
   if (lunar_calendar.solar_terms.length() > 0)
-	  updateSolarFontBits();
+    updateSolarFontBits();
 }
 
-void WL_FRAME::updateWeatherNow(WeatherData weather_data)
-{
+void WL_FRAME::updateWeatherNow(WeatherData weather_data) {
   weather_now = weather_data;
   const char* icon_id[] = {weather_now.icon_id.c_str(), ""};
   updateWeatherIconBits(LARGE, icon_id);
 }
   
-void WL_FRAME::drawWeatherNow(OLEDDisplay *display, int16_t x, int16_t y)
-{
+void WL_FRAME::drawWeatherNow(OLEDDisplay *display, int16_t x, int16_t y) {
   //Serial.printf("WL_FRAME::drawWeatherNow %s,%d\n", weather_now.icon_id, weather_now.air_temp_low);
 
   if (strlen(w_icon48.icon_id) != 2)
@@ -195,8 +188,7 @@ void WL_FRAME::showSolarTerm(OLEDDisplay *display, int16_t x, int16_t y) {
 }
 
 
-void WL_FRAME::drawLunarCalendar(OLEDDisplay *display, int16_t x, int16_t y)
-{
+void WL_FRAME::drawLunarCalendar(OLEDDisplay *display, int16_t x, int16_t y) {
   if (lunar_calendar.date_str.length() == 0)
     return;
 
@@ -219,35 +211,32 @@ void WL_FRAME::drawLunarCalendar(OLEDDisplay *display, int16_t x, int16_t y)
     showSolarTerm(display, x, y);
   else
     showMMDD(lunar_calendar.date_str, display, x, y);
-	
+  
   //showHzStr(lunar_calendar.workday, display, x + 91, y + 32, false);
   display->drawXbm(x + 94, y + 32, FZYT_FONT_WEIGHT, FZYT_FONT_HEIGHT, workday_icon.bits);
 }
 
 void WL_FRAME::digitalClock(struct tm *p,
-                            OLEDDisplay *display, int16_t x, int16_t y)
-{
+                            OLEDDisplay *display, int16_t x, int16_t y) {
   show2Digits(p->tm_hour, SMALL, display, x + 2, y);
   show2Digits(p->tm_min, SMALL, display, x + 2, y + 31);
   show2Digits(0 - p->tm_sec, LARGE, display, x + 54, y + 2);
 }
 
-
-void WL_FRAME::TnHMeter(int8_t temperature, int8_t humidity,
-                         OLEDDisplay *display, int16_t x, int16_t y)
-{
-  show2Digits(temperature, LARGE, display, x, y + 2);
+// 温湿度显示
+void WL_FRAME::TnHMeter(float temperature, float humidity,
+                        OLEDDisplay *display, int16_t x, int16_t y) {
+  show2Digits(round(temperature), LARGE, display, x, y + 2);
 
   //showHzStr("湿", display, x + 94, y, false);
   display->drawXbm(x + 94, y, FZYT_FONT_WEIGHT, FZYT_FONT_HEIGHT, humidity_icon.bits);
-  show2Digits(humidity, SMALL, display, x + 89, y + 34);
+  show2Digits(round(humidity), SMALL, display, x + 89, y + 34);
 }
 
 
 // 日期MM/DD
 void WL_FRAME::showMMDD(String date_str, // YYYYMMDD
-                        OLEDDisplay *display, int16_t x, int16_t y)
-{
+                        OLEDDisplay *display, int16_t x, int16_t y) {
   if (date_str.length() != String("YYYYMMDD").length())
     return;
 
@@ -262,9 +251,8 @@ void WL_FRAME::showMMDD(String date_str, // YYYYMMDD
   show2Digits(month, SMALL, display, x + 0, y + 32);
   show2Digits(day, SMALL, display, x + 51, y + 32);
 }
-				
-const unsigned char *WL_FRAME::digitBits(int number, FontSize font_size, bool if_reverse)
-{
+        
+const unsigned char *WL_FRAME::digitBits(int number, FontSize font_size, bool if_reverse) {
   static const unsigned char *source_bits;
 
   if (font_size == LARGE)
@@ -279,8 +267,7 @@ const unsigned char *WL_FRAME::digitBits(int number, FontSize font_size, bool if
 }
 
 void WL_FRAME::show2Digits(int number, FontSize font_size,
-                           OLEDDisplay *display, int16_t x, int16_t y)
-{
+                           OLEDDisplay *display, int16_t x, int16_t y) {
   bool if_reverse = number < 0 ? true : false;
   int abs_number = number < 0 ? 0 - number : number;
   int first_digit = int(abs_number / 10);
@@ -289,30 +276,23 @@ void WL_FRAME::show2Digits(int number, FontSize font_size,
   //if (number < 10)
   //  Serial.printf("WL_FRAME::show2Digits %d,%d,%d\n", number, first_digit, second_digit);
 
-  if (font_size == LARGE)
-  {
+  if (font_size == LARGE) {
     display->drawXbm(x, y, NUMBER_L_WEIGHT, NUMBER_L_HEIGHT, digitBits(first_digit, font_size, if_reverse));
     display->drawXbm(x + NUMBER_L_WEIGHT + 1, y, NUMBER_L_WEIGHT, NUMBER_L_HEIGHT, digitBits(second_digit, font_size, if_reverse));
-  }
-  else
-  {
+  } else {
     display->drawXbm(x, y, NUMBER_S_WEIGHT, NUMBER_S_HEIGHT, digitBits(first_digit, font_size, if_reverse));
     display->drawXbm(x + NUMBER_S_WEIGHT + 1, y, NUMBER_S_WEIGHT, NUMBER_S_HEIGHT, digitBits(second_digit, font_size, if_reverse));
   }
 }
 
 
-const unsigned char *WL_FRAME::reverseDigitBits(const unsigned char *source_bits, FontSize font_size)
-{
-  if (font_size == LARGE)
-  {
+const unsigned char *WL_FRAME::reverseDigitBits(const unsigned char *source_bits, FontSize font_size) {
+  if (font_size == LARGE) {
     static unsigned char desc_bits[(int(NUMBER_L_WEIGHT / 8) + 1) * NUMBER_L_HEIGHT];
     reverseAllBits(desc_bits, source_bits, NUMBER_L_WEIGHT, NUMBER_L_HEIGHT);
 
     return desc_bits;
-  }
-  else
-  {
+  } else {
     static unsigned char desc_bits[(int(NUMBER_S_WEIGHT / 8) + 1) * NUMBER_S_HEIGHT];
     reverseAllBits(desc_bits, source_bits, NUMBER_S_WEIGHT, NUMBER_S_HEIGHT);
 
